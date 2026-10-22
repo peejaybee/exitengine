@@ -242,8 +242,23 @@ const PHASE_NAMES = ['', 'wound', 'shadow', 'rebirth', 'integration', 'sovereign
 let CONFIG = {};
 let HISTORY = []; // [{ role: 'tutor'|'user', text }]
 
-function loadConfig() {
-  try { CONFIG = JSON.parse(localStorage.getItem(STORE_KEY) || '{}'); } catch (_) { CONFIG = {}; }
+async function loadConfig() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (raw) {
+      CONFIG = JSON.parse(raw);
+    } else {
+      const r = await fetch('config.json');
+      if (r.ok) {
+        const j = await r.json();
+        CONFIG = {};
+        for (const [k, v] of Object.entries(j)) {
+          if (!k.startsWith('_') || k === '_meta') CONFIG[k] = v;
+        }
+        saveConfig();
+      }
+    }
+  } catch (_) { CONFIG = CONFIG || {}; }
   CONFIG._meta = CONFIG._meta || { tutor_phase: 1, lessons_completed: [], first_run: true };
   if (!CONFIG._meta.tutor_phase) CONFIG._meta.tutor_phase = 1;
 }
@@ -409,6 +424,42 @@ const ACTIONS = {
     });
   },
   'advance:2': () => { setPhase(2); pushTutor(OPENINGS[2]()); },
+  'phase1_identity': () => {
+    pushUser('The identity loss — I was that job.');
+    pushTutor({
+      h2: 'You were not the badge',
+      text: `When someone asks "what do you do?" and the answer disappears overnight, it feels like you disappeared too. You didn't.<br><br>The title belonged to them. The judgement, the craft, and the reputation people actually trusted belonged to you. Right now it's okay to grieve the container. When the dust settles, we'll separate who you are from where you worked.`,
+      ctas: [
+        { label: 'I\'m ready to move to phase 2', action: 'advance:2' },
+        { label: 'I want to keep talking', action: 'compose_open' },
+        { label: 'I need to step away · I\'ll come back', action: 'goto:index.html' },
+      ],
+    });
+  },
+  'phase1_money': () => {
+    pushUser('The money fear.');
+    pushTutor({
+      h2: 'Fear shrinks when you price it',
+      text: `Money fear is loudest when it's a fog. Two things cut through the fog:<br><br>1. <strong>Know your actual runway</strong> — what goes out each month if you cut the noise, and how many months you have.<br>2. <strong>Remember how little it takes to bridge</strong> — one client paying your day rate a few days a month changes the math completely.<br><br>Don't panic-apply to 100 jobs tonight. Breathe first. Then we'll build a bridge.`,
+      ctas: [
+        { label: 'I\'m ready to move to phase 2', action: 'advance:2' },
+        { label: 'I want to keep talking', action: 'compose_open' },
+        { label: 'I need to step away · I\'ll come back', action: 'goto:index.html' },
+      ],
+    });
+  },
+  'phase1_people': () => {
+    pushUser('The people I lost — colleagues, routine.');
+    pushTutor({
+      h2: 'You lost the hallway, not the people',
+      text: `The sudden silence — no Slack, no morning standup, no shared jokes — is a real shock to the nervous system.<br><br>Here is the truth: the people who actually mattered to you there are still your people. You don't need a company email address to know them. Give yourself a few days, then reach out to the two or three you genuinely liked — just as a human, not networking.`,
+      ctas: [
+        { label: 'I\'m ready to move to phase 2', action: 'advance:2' },
+        { label: 'I want to keep talking', action: 'compose_open' },
+        { label: 'I need to step away · I\'ll come back', action: 'goto:index.html' },
+      ],
+    });
+  },
   'advance:3': () => { setPhase(3); pushTutor(OPENINGS[3]()); },
   'advance:4': () => { setPhase(4); pushTutor(OPENINGS[4]()); },
   'advance:5': () => { setPhase(5); pushTutor(OPENINGS[5]()); },
@@ -536,7 +587,7 @@ function draftOutreach(target) {
 
 Hope you're well. ${name === 'there' ? '' : `${where} — `}I've been thinking about reaching out.
 
-Quick update: I left ${CONFIG._industry_freeform || CONFIG.industry || 'my last role'} in [month] and I'm now consulting independently, focused on ${industryReframe().split(' · ')[1] || 'the things I'm best at'}.
+Quick update: I left ${CONFIG._industry_freeform || CONFIG.industry || 'my last role'} in [month] and I'm now consulting independently, focused on ${industryReframe().split(' · ')[1] || "the things I'm best at"}.
 
 The reason I'm writing: I think there's a chance ${role === 'your role' ? 'what you work on' : role} could use a hand right now. No pitch — just a 20-minute call to compare notes. I might be able to help. If not, it's been good catching up either way.
 
@@ -625,9 +676,9 @@ async function callOpenAI(userText) {
 }
 
 async function callGoogle(userText) {
-  const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${CONFIG.api_key}`, {
+  const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${CONFIG.api_key}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': CONFIG.api_key },
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: tutorSystemPrompt() }] },
       contents: [
@@ -734,8 +785,9 @@ document.getElementById('input').addEventListener('keydown', (e) => {
 });
 
 /* ═══════════ BOOT ═══════════ */
-function boot() {
-  loadConfig();
+async function boot() {
+  await loadConfig();
+
   loadHistory();
   renderPhaseChip();
 

@@ -628,6 +628,7 @@ function loadConfig() {
       CONFIG = { ...DEFAULT_CONFIG, ...cleaned };
       CONFIG._meta = { ...DEFAULT_CONFIG._meta, ...(CONFIG._meta || {}) };
       saveConfigSilent();
+      renderDashboard();
     }
   }).catch(() => {});
 }

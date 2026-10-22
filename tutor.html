@@ -676,7 +676,7 @@ async function callOpenAI(userText) {
 }
 
 async function callGoogle(userText) {
-  const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${CONFIG.api_key}`, {
+  const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${CONFIG.api_key}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': CONFIG.api_key },
     body: JSON.stringify({
@@ -689,7 +689,8 @@ async function callGoogle(userText) {
   });
   if (!r.ok) throw new Error('google: ' + r.status);
   const j = await r.json();
-  return j.candidates[0].content.parts[0].text;
+  const parts = j.candidates?.[0]?.content?.parts || [];
+  return (parts.find(p => !p.thought && p.text) || parts[0])?.text || '';
 }
 
 function fallbackReply(text) {
